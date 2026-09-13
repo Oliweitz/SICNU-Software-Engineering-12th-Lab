@@ -10,18 +10,18 @@
 
 | 层次 | 选型 |
 |---|---|
-| 后端 | Spring Boot 3.x + MyBatis-Plus 3.5.x + Spring Security(JWT) |
+| 后端 | Spring Boot 3.5.4 + MyBatis-Plus 3.5.12 + Spring Security(JWT) |
 | 数据库 | MySQL 8.x(+ Redis 可选) |
 | 实时通信 | Spring WebSocket(虚拟课堂文字事件流) |
 | 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts(迭代 3 引入) |
 | 构建 | Maven 3.9.x / JDK 17 目标 / JUnit 5 |
 
-架构选型与降级策略详见 [docs/技术方案.md](docs/技术方案.md)。
+架构选型与延后项管理详见 [docs/技术方案.md](docs/技术方案.md)。
 
 ## 快速开始
 
 ```bash
-# 1. 初始化数据库(首次,需本机 MySQL 8.x)
+# 1. 初始化数据库(首次,需 MySQL 8.x)
 mysql -u root -p < docs/init.sql
 
 # 2. 启动后端(8080)
@@ -58,8 +58,8 @@ mvn spotless:check      # 检查格式是否合规(CI 使用)
 │   └── init.sql                   # 建库建表脚本 + 种子数据(交付物)
 ├── src/main/java/com/example/
 │   ├── Application.java           # 启动类
-│   ├── common/                    # 统一响应/异常/分页(已就绪)
-│   ├── config/                    # MyBatis-Plus/CORS 配置(已就绪)
+│   ├── common/                    # 统一响应/异常/分页基础组件
+│   ├── config/                    # MyBatis-Plus/CORS 配置
 │   ├── security/                  # JWT 认证(迭代 1)
 │   └── module/                    # 业务域分包(迭代 1 起逐步填充)
 │       ├── user/ clazz/ task/ trial/ evaluate/
@@ -88,10 +88,11 @@ mvn spotless:check      # 检查格式是否合规(CI 使用)
 
 | 迭代 | 内容 | 状态 |
 |---|---|---|
-| 迭代 0:脚手架 | 工程骨架/统一响应/规范/数据库脚本 | ✅ 本仓库初始提交 |
-| 迭代 1:脚手架 + 身份 | 登录注册(JWT)、班级/课程管理 | 🔲 |
-| 迭代 2:核心闭环 | 任务发布、试讲提交、RuleEvaluator、评测报告 | 🔲 |
-| 迭代 3:支撑功能 | 题库、批阅、看板、Excel 导出、排行榜、进步曲线 | 🔲 |
-| 迭代 4:增强(可选) | 虚拟课堂(WebSocket)、音视频上传、证书、LLM 增强 | 🔲 |
+| 迭代 0:脚手架 | 工程骨架/统一响应/规范/数据库脚本 | ✅ 已完成 |
+| 迭代 1:身份与课程 | 登录注册(JWT)、班级/课程管理 | 进行中 |
+| 迭代 2:核心闭环 | 任务发布、试讲提交、RuleEvaluator、评测报告 | 未开始 |
+| 迭代 3:支撑功能 | 题库、批阅、看板、Excel 导出、排行榜、进步曲线 | 未开始 |
+| 迭代 4:增强(可选) | 虚拟课堂(WebSocket)、音视频上传、证书、LLM 增强 | 未开始 |
+| 迭代 5:AI 音视频评测与延后项(尽力) | 普通话 ASR 评测、姿态分析、直播、微服务最小拆分 | 未开始 |
 
 详细设计见 [docs/技术方案.md](docs/技术方案.md) 第 9 节。

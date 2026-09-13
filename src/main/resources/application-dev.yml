@@ -1,12 +1,12 @@
 # ============================================================
 # 开发环境配置
-# 前提：本机安装 MySQL 8.x 并执行 docs/init.sql（见 docs/环境配置.md）
+# 前提：安装 MySQL 8.x 并执行 docs/init.sql（见 docs/环境配置.md）
 # ============================================================
 
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 中文参数、时区务必带上（常见问题见 docs/环境配置.md 第 5 节）
+    # 中文参数、时区务必带上（常见问题见 docs/环境配置.md 第 6 节）
     url: jdbc:mysql://localhost:3306/ai_trial_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
