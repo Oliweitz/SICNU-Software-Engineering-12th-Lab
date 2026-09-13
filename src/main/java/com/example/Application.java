@@ -1,5 +1,6 @@
 package com.example;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -15,6 +16,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *   <li>module/ 按业务域分包：user / clazz / task / trial / evaluate / report / review / resource / stats
  * </ul>
  */
+@MapperScan("com.example.module.**.mapper")
 @SpringBootApplication
 public class Application {
 
