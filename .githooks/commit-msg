@@ -1,0 +1,49 @@
+#!/bin/sh
+# ============================================================
+# commit-msg 钩子：校验提交信息符合 Conventional Commits 规范
+# 启用方式(每位成员 clone 后执行一次)：
+#   git config core.hooksPath .githooks
+# 完整规范见 docs/Git工作流与提交规范.md
+# 注意：merge / revert 等自动生成的提交不强制校验
+# ============================================================
+
+MSG_FILE="$1"
+MSG=$(cat "$MSG_FILE")
+
+# 跳过 git 自动生成的提交（merge、rebase、cherry-pick、revert）
+case "$MSG" in
+    Merge\ *|Revert\ *|"cherry-pick"*|"[squash]"*|"fixup!"*|"amend!"*)
+        exit 0
+        ;;
+esac
+
+# 第一行必须匹配：type(scope): subject（scope 可选，中英文均可）
+if ! echo "$MSG" | head -1 | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\([a-zA-Z0-9\-_]+\))?: .{1,80}$'; then
+    echo "❌ 提交信息格式不符合规范！"
+    echo ""
+    echo "格式：<type>(<scope>): <subject>"
+    echo "  type  ∈ feat|fix|docs|style|refactor|perf|test|build|ci|chore"
+    echo "  示例：feat(user): 实现登录注册接口"
+    echo ""
+    echo "当前提交信息首行："
+    head -1 "$MSG_FILE"
+    echo ""
+    echo "详细说明见 docs/Git工作流与提交规范.md；"
+    echo "可用 git commit --no-verify 跳过（仅限紧急情况，需在周报中说明）。"
+    exit 1
+fi
+
+# subject 不超过 80 字符、不以句号结尾（中文允许省略句号）
+SUBJECT=$(echo "$MSG" | head -1)
+LEN=$(printf '%s' "$SUBJECT" | wc -m)
+if [ "$LEN" -gt 80 ]; then
+    echo "❌ subject 过长（$LEN > 80 字符），请精简：$SUBJECT"
+    exit 1
+fi
+case "$SUBJECT" in
+    *\.)
+        echo "⚠️  提示：subject 以句号结尾，建议去掉（不阻断提交）"
+        ;;
+esac
+
+exit 0

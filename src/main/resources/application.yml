@@ -1,0 +1,85 @@
+# ============================================================
+# 师范专业 AI 试讲台系统 —— 公共配置（所有环境生效）
+# 环境差异配置见 application-dev.yml / application-prod.yml
+# 切换环境：--spring.profiles.active=dev|prod 或修改 spring.profiles.active
+# ============================================================
+
+spring:
+  application:
+    name: ai-trial-platform
+  profiles:
+    # 默认开发环境
+    active: dev
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+# ------------------------------------------------------------
+# MyBatis-Plus
+# ------------------------------------------------------------
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.example.module.**.entity
+  configuration:
+    # 数据库下划线字段 ↔ 实体驼峰属性自动映射
+    map-underscore-to-camel-case: true
+    # SQL 日志（开发环境打印，生产关闭）
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      # 逻辑删除字段：1 表示已删除（表中需定义 deleted 列）
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ------------------------------------------------------------
+# 业务自定义配置（对应 security 模块，迭代 1 使用）
+# ------------------------------------------------------------
+jwt:
+  # ⚠️ 生产环境务必通过环境变量 JWT_SECRET 覆盖，勿提交真实密钥
+  secret: ${JWT_SECRET:software-engineering-course-design-secret-key-2026}
+  # 登录有效期（小时）
+  expire-hours: 24
+  # 请求头名称
+  header: Authorization
+  # 令牌前缀
+  token-prefix: "Bearer "
+
+# ------------------------------------------------------------
+# 评测引擎配置（对应 evaluate 模块，迭代 2 使用）
+# 实现可插拔：rule = 规则引擎（默认，零依赖可解释）；llm = 大模型增强（需 API Key）
+# ------------------------------------------------------------
+evaluate:
+  impl: rule
+  llm:
+    base-url: ""
+    api-key: ""
+
+# ------------------------------------------------------------
+# 文件存储（试讲音视频上传，迭代 4 使用；本地磁盘模拟对象存储）
+# ------------------------------------------------------------
+storage:
+  type: local
+  local:
+    base-dir: ./uploads
+
+# ------------------------------------------------------------
+# Actuator 监控端点（答辩演示 /actuator/health）
+# ------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.example: debug

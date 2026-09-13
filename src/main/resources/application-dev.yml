@@ -1,0 +1,21 @@
+# ============================================================
+# 开发环境配置
+# 前提：本机安装 MySQL 8.x 并执行 docs/init.sql（见 docs/环境配置.md）
+# ============================================================
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 中文参数、时区务必带上（常见问题见 docs/环境配置.md 第 5 节）
+    url: jdbc:mysql://localhost:3306/ai_trial_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    hikari:
+      # -1 = 启动时不校验数据库连通（未装 MySQL 也能先启动服务，首次访问 DB 时报错）
+      initialization-fail-timeout: -1
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+logging:
+  level:
+    com.example: debug

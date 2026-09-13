@@ -1,0 +1,22 @@
+# EditorConfig：统一 IDE 基础设置（IDEA / VS Code 均原生支持）
+# 详细编码规范见 docs/代码规范.md
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.java]
+indent_size = 4
+
+[*.{xml,yml,yaml,json,md,sql}]
+indent_size = 2
+
+[*.{js,ts,vue,css,html}]
+indent_size = 2
+
+[*.bat]
+end_of_line = crlf

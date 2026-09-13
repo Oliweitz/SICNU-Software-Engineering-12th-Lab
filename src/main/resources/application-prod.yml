@@ -1,0 +1,26 @@
+# ============================================================
+# 生产/演示环境配置模板
+# 启动：mvn spring-boot:run -Dspring-boot.run.profiles=prod
+# 敏感信息一律通过环境变量注入（见下方占位符），禁止写入仓库
+# ============================================================
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ai_trial_platform}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+mybatis-plus:
+  configuration:
+    # 生产环境关闭 SQL 日志
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+logging:
+  level:
+    com.example: info
+  file:
+    name: ./logs/ai-trial-platform.log

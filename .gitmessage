@@ -1,0 +1,24 @@
+
+# <type>(<scope>): <subject>
+# 空一行
+# <body：说明修改动机与要点，与上一条行为对比>
+# 空一行
+# <footer：关联信息，如 Ref: #12 / BREAKING CHANGE: ...>
+#
+# type 必填，取值（对应 docs/Git工作流与提交规范.md）：
+#   feat     新功能
+#   fix      缺陷修复
+#   docs     仅文档变更
+#   style    代码格式/空白调整（不影响逻辑）
+#   refactor 重构（非新功能、非缺陷修复）
+#   perf     性能优化
+#   test     测试相关
+#   build    构建系统或外部依赖变更（pom.xml 等）
+#   ci       CI 配置变更
+#   chore    其他杂项
+#
+# scope 可选：模块名，如 user/clazz/task/trial/evaluate/report/resource/stats/common
+# subject 规则：≤ 50 字符、祈使句、不以句号结尾、中文直接陈述即可
+# 示例：
+#   feat(user): 实现登录注册接口
+#   fix(evaluate): 修复口头禅检测正则误匹配标点
