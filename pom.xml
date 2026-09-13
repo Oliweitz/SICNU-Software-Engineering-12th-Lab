@@ -21,14 +21,14 @@
   <packaging>jar</packaging>
 
   <properties>
-    <!-- 编译目标 Java 版本（本机 JDK 24 编译，目标字节码 17） -->
+    <!-- 编译目标 Java 版本：字节码目标 17，兼容 JDK 17+ -->
     <java.version>17</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- 第三方依赖版本统一在此声明（对应 docs/技术方案.md 3.2 技术选型） -->
     <mybatis-plus.version>3.5.12</mybatis-plus.version>
     <jjwt.version>0.12.6</jjwt.version>
     <easyexcel.version>4.0.3</easyexcel.version>
-    <!-- 显式锁定 Lombok：父工程管理的 1.18.38 不支持本机 JDK 24，1.18.42+ 支持 -->
+    <!-- 显式锁定 Lombok：父工程默认版本在 JDK 23+ 下注解处理器可能失效，锁定兼容版本 -->
     <lombok.version>1.18.48</lombok.version>
     <spotless.version>2.44.5</spotless.version>
     <google-java-format.version>1.25.0</google-java-format.version>
