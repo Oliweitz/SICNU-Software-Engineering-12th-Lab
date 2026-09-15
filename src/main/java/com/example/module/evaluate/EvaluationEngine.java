@@ -88,11 +88,20 @@ public class EvaluationEngine {
                             .build());
         }
 
-        return EvaluationResult.builder()
-                .totalScore(totalScore(dimensions))
-                .dimensions(dimensions)
-                .issues(issues)
-                .build();
+        EvaluationResult result =
+                EvaluationResult.builder()
+                        .totalScore(totalScore(dimensions))
+                        .dimensions(dimensions)
+                        .issues(issues)
+                        .build();
+
+        if (!result.evaluated()) {
+            // 未产出任何维度分：多半是评测器未注册（漏加 @Component）或输入为空
+            log.warn(
+                    "本次评测未产出任何维度分（已注册评测器 {} 个），结果标记为「未评测」；" + "调用方不应据此落库评测报告，否则会被当作真实 0 分",
+                    evaluators.size());
+        }
+        return result;
     }
 
     /** 将单个评测器的产出按其声明的贡献权重累加进中间结果，并校验维度声明的一致性 */

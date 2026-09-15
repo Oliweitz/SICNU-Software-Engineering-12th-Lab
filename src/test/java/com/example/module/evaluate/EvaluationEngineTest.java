@@ -1,8 +1,10 @@
 package com.example.module.evaluate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -235,5 +237,60 @@ class EvaluationEngineTest {
         EvaluationEngine engine = engineOf(stub(Map.of(Dimension.EXPRESSION, 100), withIssue));
 
         assertEquals(1, engine.evaluate(emptyContext()).getIssues().size());
+    }
+
+    // ---------- 「未评测」与「0 分」的区分 ----------
+
+    @Test
+    @DisplayName("无评测器产出：evaluated() 为 false，表示尚未评测而非 0 分")
+    void notEvaluatedWhenNoDimensionProduced() {
+        EvaluationResult result = new EvaluationEngine(List.of()).evaluate(emptyContext());
+
+        assertFalse(result.evaluated(), "未产出维度分时必须标记为未评测");
+        assertEquals(0.0, result.getTotalScore(), "总分字段为 0，但语义是「未评测」");
+    }
+
+    @Test
+    @DisplayName("产出维度分：evaluated() 为 true")
+    void evaluatedWhenDimensionProduced() {
+        EvaluationEngine engine =
+                engineOf(stub(Map.of(Dimension.CONTENT, 100), resultOf(Dimension.CONTENT, 88)));
+
+        assertTrue(engine.evaluate(emptyContext()).evaluated());
+    }
+
+    @Test
+    @DisplayName("维度分恰为 0 时仍属「已评测」，不得与未评测混淆")
+    void zeroScoreIsStillEvaluated() {
+        EvaluationEngine engine =
+                engineOf(stub(Map.of(Dimension.CONTENT, 100), resultOf(Dimension.CONTENT, 0)));
+
+        EvaluationResult result = engine.evaluate(emptyContext());
+
+        assertTrue(result.evaluated(), "得 0 分是有效评测结果，与「未评测」是两回事");
+        assertEquals(0.0, result.getTotalScore());
+    }
+
+    @Test
+    @DisplayName("EvaluationResult.empty() 的 evaluated() 为 false 且可安全取用集合")
+    void emptyResultIsNotEvaluated() {
+        EvaluationResult result = EvaluationResult.empty();
+
+        assertFalse(result.evaluated());
+        assertTrue(result.getDimensions().isEmpty());
+        assertTrue(result.getIssues().isEmpty());
+    }
+
+    @Test
+    @DisplayName("evaluated() 不得混入 JSON 契约，避免与 dimensions 形成冗余字段")
+    void evaluatedIsNotSerialized() throws Exception {
+        EvaluationEngine engine =
+                engineOf(stub(Map.of(Dimension.CONTENT, 100), resultOf(Dimension.CONTENT, 88)));
+
+        String json = new ObjectMapper().writeValueAsString(engine.evaluate(emptyContext()));
+
+        assertFalse(json.contains("evaluated"), "序列化结果中不应出现 evaluated 字段：" + json);
+        assertTrue(json.contains("totalScore"));
+        assertTrue(json.contains("dimensions"));
     }
 }
