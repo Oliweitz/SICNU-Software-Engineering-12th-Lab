@@ -2,7 +2,10 @@ package com.example.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -45,5 +48,20 @@ class ResultTest {
 
         assertEquals(ResultCode.BAD_REQUEST.getCode(), result.getCode());
         assertEquals("用户名不能为空", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("序列化：全局 non_null 配置下 data 键仍必须存在（契约 {code, message, data} 三字段恒定）")
+    void dataKeyAlwaysPresentInJson() throws Exception {
+        // 复现 application.yml 的全局配置 default-property-inclusion: non_null
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+
+        String okJson = mapper.writeValueAsString(Result.ok());
+        String failJson = mapper.writeValueAsString(Result.fail(ResultCode.NOT_FOUND));
+
+        assertTrue(okJson.contains("\"data\""), "成功响应缺少 data 键：" + okJson);
+        assertTrue(failJson.contains("\"data\""), "失败响应缺少 data 键：" + failJson);
+        assertEquals("{\"code\":0,\"message\":\"成功\",\"data\":null}", okJson);
     }
 }

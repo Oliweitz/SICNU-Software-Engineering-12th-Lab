@@ -1,5 +1,6 @@
 package com.example.common;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
@@ -18,7 +19,15 @@ public class Result<T> {
     /** 提示信息 */
     private String message;
 
-    /** 业务数据 */
+    /**
+     * 业务数据
+     *
+     * <p>{@code @JsonInclude(ALWAYS)} 显式覆盖 application.yml 中全局的 {@code default-property-inclusion:
+     * non_null}： 全局配置会令 null 字段整个从 JSON 中消失，导致「无数据的成功响应」缺失 {@code data} 键， 与文档约定的 {@code {code,
+     * message, data}} 三字段契约不符。此处保证 <b>data 键始终存在</b>（无数据时为 {@code null}）， 前端可安全地统一按 {@code
+     * res.data} 取值。
+     */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     private T data;
 
     private Result(int code, String message, T data) {
