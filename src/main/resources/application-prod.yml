@@ -19,6 +19,13 @@ mybatis-plus:
     # 生产环境关闭 SQL 日志
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
+management:
+  endpoint:
+    health:
+      # 生产/演示环境不暴露健康详情
+      # application.yml 中全局配置为 always，会把数据库连接等内部信息一并暴露给访问者
+      show-details: never
+
 logging:
   level:
     com.example: info
