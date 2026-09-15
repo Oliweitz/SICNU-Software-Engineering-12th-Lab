@@ -13,7 +13,7 @@
 | 后端 | Spring Boot 3.5.4 + MyBatis-Plus 3.5.12 + Spring Security(JWT) |
 | 数据库 | MySQL 8.x(+ Redis 可选) |
 | 实时通信 | Spring WebSocket(虚拟课堂文字事件流) |
-| 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts(迭代 3 引入) |
+| 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts(迭代 2 引入) |
 | 构建 | Maven 3.9.x / JDK 17 目标 / JUnit 5 |
 
 架构选型与延后项管理详见 [docs/技术方案.md](docs/技术方案.md)。
@@ -52,10 +52,11 @@ mvn spotless:check      # 检查格式是否合规(CI 使用)
 ├── README.md                      # 本文档
 ├── docs/                          # 全部设计文档(交付物)
 │   ├── 技术方案.md                 # 需求/架构/数据库/接口/迭代计划
+│   ├── 数据库设计规范.md            # 命名/类型/索引/注释/逻辑删除规约(权威)
 │   ├── 环境配置.md                 # 环境准备与常见问题
 │   ├── 代码规范.md                 # Java/前端/SQL 编码规范
 │   ├── Git工作流与提交规范.md       # 分支模型/提交信息/评审流程
-│   └── init.sql                   # 建库建表脚本 + 种子数据(交付物)
+│   └── init.sql                   # 建库建表脚本 + 种子数据(表结构唯一权威源)
 ├── src/main/java/com/example/
 │   ├── Application.java           # 启动类
 │   ├── common/                    # 统一响应/异常/分页基础组件

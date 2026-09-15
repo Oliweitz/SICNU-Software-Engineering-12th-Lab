@@ -28,6 +28,14 @@ public class TrialContext {
     /** 任务配置的知识点清单（教学内容维度覆盖度比对） */
     private List<String> knowledgePoints;
 
+    /**
+     * 各维度的评分权重（来自任务 {@code rubric_json}，教师可自定义）
+     *
+     * <p>由 {@code EvaluationEngine} 用于计算总分：总分 = Σ(维度分 × 维度权重) ÷ Σ(维度权重)。 为空时引擎回退到内置默认权重（内容 25 / 表达
+     * 25 / 教态 15 / 互动 15 / 板书 10 / 时间 10）。
+     */
+    private Map<Dimension, Integer> dimensionWeights;
+
     /** 各环节实测时长（秒），key 为环节名：导入/新授/练习/小结/作业 */
     private Map<String, Integer> stageTimes;
 
@@ -39,4 +47,12 @@ public class TrialContext {
 
     /** 试讲视频路径（可选，迭代 4 起） */
     private String videoPath;
+
+    /**
+     * 自评量表结果（10 项自评，来自 trial.self_assessment_json）
+     *
+     * <p>用途：普通话 / 教姿教态维度的**保底数据来源**——百度 API 未配置、调用失败或超额度时，{@code AsrEvaluator} / {@code
+     * PostureEvaluator} 回退为「自评量表 + 教师评分」（见技术方案第 6.4 节）。
+     */
+    private Map<String, Integer> selfAssessment;
 }

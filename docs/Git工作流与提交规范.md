@@ -118,5 +118,6 @@ Ref: #12
 |---|---|
 | 提交时钩子报"格式不符合规范" | 按提示修改提交信息;`git commit --amend` 重写 |
 | 忘了切新分支,直接改在 develop 上 | `git stash` → 切功能分支 → `git stash pop` → 重新提交 |
+| **分支 ahead/behind 显示异常,或与实际不符** | **远程引用已陈旧**。`git branch -vv` 的 ahead/behind 是拿本地缓存的远端快照算的,长期不 `fetch` 会得出完全相反的结论(例如把「本地落后」误判为「本地领先」)。判断分支状态前先执行 `git fetch --all --prune`;跨机协作时每次开工前执行一次 |
 | 换行符 diff 噪音 | 确认 `.gitattributes` 已提交、`core.autocrlf` 已配置 |
 | 敏感信息(密钥/密码)误提交 | 立即 `git revert`,更换密钥,并在周报中说明 |
