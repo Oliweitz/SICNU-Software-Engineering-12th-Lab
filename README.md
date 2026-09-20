@@ -38,16 +38,35 @@
 
 ## 快速开始
 
+> ⚠️ **`docs/init.sql` 开头是 `DROP DATABASE IF EXISTS ai_trial_platform`，重跑会清空同名库的全部数据。**
+> 它只用于**全新环境初始化**；库已建好时不要重跑。动手前先确认库是否存在：
+> `mysql -u root -p -e "SHOW DATABASES LIKE 'ai_trial_platform';"`
+
 ```bash
-# 1. 初始化数据库（首次，需 MySQL 8.x）
+# 1. 初始化数据库（仅首次，需 MySQL 8.x）
 mysql -u root -p < docs/init.sql
 
-# 2. 启动后端（8080）
+# 2. 配置数据库密码（仅当 root 密码不是默认的 root，详见 docs/环境配置.md 第 3.1 节）
+#    Git Bash / Linux / macOS：
+export DB_PASSWORD=你的密码
+#    Windows 用户级环境变量（之后新开的终端自动生效）：
+#    [Environment]::SetEnvironmentVariable("DB_PASSWORD","你的密码","User")
+
+# 3. 启动后端（8080）
 mvn spring-boot:run
 
-# 3. 健康检查
+# 4. 健康检查
 curl http://localhost:8080/actuator/health
 ```
+
+> **PowerShell 用户注意两处语法差异**：① PowerShell 不支持 `<` 输入重定向
+> （报「`<`运算符是为将来使用而保留的」），第 1 步改用 mysql 客户端内置的 `source`：
+> `mysql -u root -p -e "source docs/init.sql"`；② PowerShell 里 `curl` 是 `Invoke-WebRequest`
+> 的别名，第 4 步请用 `curl.exe`。
+
+> **数据库密码不对的典型症状**：启动日志一切正常，但 `/actuator/health` 卡满 30 秒后返回
+> `"db":{"status":"DOWN"}`——那是 HikariCP 的连接超时，真正的原因 `Access denied for user 'root'@'localhost'`
+> 只藏在 health 端点里，启动日志看不到。改完密码要**完全重启终端/IDEA**才生效（环境变量在进程启动时读取一次）。
 
 > **`init.sql` 无需额外字符集参数**——脚本开头已 `SET NAMES utf8mb4`，
 > 这是为了修正 Windows 中文环境下 mysql 客户端默认 `character_set_client=gbk` 导致的中文乱码与 `ERROR 1366`。
