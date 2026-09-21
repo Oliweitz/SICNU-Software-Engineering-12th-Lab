@@ -92,9 +92,9 @@ CREATE TABLE task (
     stage            VARCHAR(20)  NOT NULL COMMENT '学段：小学 / 初中 / 高中',
     textbook_version VARCHAR(50)  DEFAULT NULL COMMENT '教材版本（人教/北师大等）',
     mode             VARCHAR(20)  NOT NULL COMMENT '训练模式：FREE 自由试讲 / SCENARIO 情景模拟 / STRUCTURED 结构化面试 / EXAM 模拟考核',
-    duration_minutes INT          NOT NULL COMMENT '规定时长（分钟）',
-    deadline         DATETIME     DEFAULT NULL COMMENT '截止时间',
-    rubric_json      JSON         NOT NULL COMMENT '评分标准 JSON（维度 / 权重 / 知识点清单，见技术方案 6.2；可由 resource(type=RUBRIC) 模板复制而来）',
+    duration_minutes INT          NOT NULL COMMENT '规定时长（分钟，> 0）',
+    deadline         DATETIME     DEFAULT NULL COMMENT '截止时间（NULL 表示不设截止，任务长期有效）',
+    rubric_json      JSON         NOT NULL COMMENT '评分标准 JSON（维度 / 权重 / 知识点清单，见技术方案 6.2；可由 resource(type=RUBRIC) 模板复制而来。各维度 weight 必须 > 0，总分按 Σ权重 归一化，权重之和不必为 100）',
     status           VARCHAR(20)  NOT NULL DEFAULT 'PUBLISHED' COMMENT '状态：DRAFT 草稿 / PUBLISHED 已发布 / CLOSED 已关闭',
     created_by       BIGINT       NOT NULL COMMENT '发布教师 id（sys_user.id），固化实际发布人',
     created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -120,7 +120,7 @@ CREATE TABLE trial (
     audio_path           VARCHAR(255) DEFAULT NULL COMMENT '音频文件路径（可选，迭代 4）',
     video_path           VARCHAR(255) DEFAULT NULL COMMENT '视频文件路径（可选，迭代 4）',
     self_assessment_json JSON         DEFAULT NULL COMMENT '自评量表 JSON（10 项自评；普通话/教姿教态保底方案的数据来源，提交试讲时录入）',
-    duration_actual      INT          DEFAULT NULL COMMENT '实际时长（分钟）',
+    duration_actual      INT          DEFAULT NULL COMMENT '实际时长（分钟，>= 0；未录入时为 NULL）',
     stage_times_json     JSON         DEFAULT NULL COMMENT '各环节实测时长 JSON（key 为环节名，value 为秒）',
     status               VARCHAR(20)  NOT NULL DEFAULT 'SUBMITTED' COMMENT '状态：DRAFT 草稿 / SUBMITTED 已提交 / EVALUATED 已评测',
     created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
@@ -223,7 +223,9 @@ CREATE TABLE certificate (
     deleted    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
     PRIMARY KEY (id),
     -- 服务查询：学生的证书列表
-    KEY idx_student (student_id)
+    KEY idx_student (student_id),
+    -- 服务查询：某任务下的达标名单 / 按任务统计达标率
+    KEY idx_task (task_id)
 ) ENGINE = InnoDB COMMENT ='达标证书表';
 
 -- ============================================================
