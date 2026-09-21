@@ -18,3 +18,23 @@ SET NAMES utf8mb4;
 -- ------------------------------------------------------------
 ALTER TABLE certificate
     ADD KEY idx_task (task_id);
+
+-- ------------------------------------------------------------
+-- 2. 取值范围 / 空值语义补全
+--    违反规范 §7「可空列在 COMMENT 中说明何时为空」与迭代 0 遗留的
+--    取值范围缺失。**仅改 COMMENT，不动列类型与约束**。
+--    rubric_json 的口径以技术方案 §6.2 为准：总分 = Σ(维度分 × 维度权重)
+--    ÷ Σ(维度权重)，引擎按 Σ权重 归一化，故权重之和**不必**为 100，
+--    真正的约束是每个维度的 weight 必须 > 0（作分母）。
+-- ------------------------------------------------------------
+ALTER TABLE task
+    MODIFY COLUMN duration_minutes INT NOT NULL
+        COMMENT '规定时长（分钟，> 0）',
+    MODIFY COLUMN deadline DATETIME DEFAULT NULL
+        COMMENT '截止时间（NULL 表示不设截止，任务长期有效）',
+    MODIFY COLUMN rubric_json JSON NOT NULL
+        COMMENT '评分标准 JSON（维度 / 权重 / 知识点清单，见技术方案 6.2；可由 resource(type=RUBRIC) 模板复制而来。各维度 weight 必须 > 0，总分按 Σ权重 归一化，权重之和不必为 100）';
+
+ALTER TABLE trial
+    MODIFY COLUMN duration_actual INT DEFAULT NULL
+        COMMENT '实际时长（分钟，>= 0；未录入时为 NULL）';
