@@ -25,7 +25,7 @@ public class Certificate {
     /** 学生 id（sys_user.id） */
     private Long studentId;
 
-    /** 任务 id */
+    /** 任务 id（task.id） */
     private Long taskId;
 
     /** 证书类型（教学表达/课堂互动/控场/时间管理） */

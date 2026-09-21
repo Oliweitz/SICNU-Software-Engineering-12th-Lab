@@ -223,7 +223,9 @@ CREATE TABLE certificate (
     deleted    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
     PRIMARY KEY (id),
     -- 服务查询：学生的证书列表
-    KEY idx_student (student_id)
+    KEY idx_student (student_id),
+    -- 服务查询：某任务下的达标名单 / 按任务统计达标率
+    KEY idx_task (task_id)
 ) ENGINE = InnoDB COMMENT ='达标证书表';
 
 -- ============================================================
