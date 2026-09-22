@@ -1,13 +1,19 @@
 -- ============================================================
 -- 师范专业 AI 试讲台系统 —— 数据库初始化脚本
--- 环境：MySQL 8.0.x（本脚本在 8.0.45 上验证通过）
+-- 环境：MySQL 8.0.x（已在 8.0.45 实跑验证。2026-09-22 的数据字典变更经
+--       docs/migration/V2__data_dict.sql 在已有库上收敛，并与本文件逐列比对一致）
 -- 用法：mysql -u root -p < docs/init.sql
 --
 -- 说明：
---   1. 建库 ai_trial_platform + 10 张核心表（对应 docs/技术方案.md 第 5 节）
+--   1. 建库 ai_trial_platform + 12 张表
+--      = 2 张数据字典表（sys_dict_type / sys_dict_item）
+--      + 10 张业务表（对应 docs/技术方案.md 第 5 节）
 --   2. 本文件是表结构的唯一权威源；字段增删一律先改本文件，再同步技术方案第 5 节摘要
---   3. 设计规约见 docs/数据库设计规范.md（命名 / 类型 / 索引 / 注释 / 逻辑删除）
---   4. sys_user 表不预置账号：管理员账号由应用首次启动时初始化
+--   3. 设计规约见 docs/数据库设计规范.md（命名 / 类型 / 索引 / 注释 / 逻辑删除 / 数据字典）
+--   4. 枚举与字典型列的**取值权威源是 sys_dict_item 表**，不是列 COMMENT——
+--      列 COMMENT 只写字典编码（如「字典 subject」），不再重复罗列取值。
+--      设计取舍与使用规约见 docs/数据库设计规范.md 第 12 节。
+--   5. sys_user 表不预置账号：管理员账号由应用首次启动时初始化
 --      （BCrypt 加密密码无法在 SQL 中静态生成），或手动执行：
 --      迭代 1 完成后会提供 DataInitializer 自动创建 admin/admin123
 --
@@ -28,17 +34,62 @@ CREATE DATABASE ai_trial_platform
     COLLATE utf8mb4_0900_ai_ci;
 USE ai_trial_platform;
 
+-- ============================================================
+-- 一、数据字典（sys_ 前缀系统表，取值权威源）
+-- ============================================================
+
 -- ------------------------------------------------------------
--- 1. 用户表：师范生 / 教师 / 管理员
+-- 1. 数据字典类型表：登记全项目**有哪些字典**
+--    与 2 号表的关系：一张类型表 + 一张明细表的通用字典，新增字典**无需 DDL**
+-- ------------------------------------------------------------
+CREATE TABLE sys_dict_type (
+    id         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    dict_type  VARCHAR(50)  NOT NULL COMMENT '字典类型编码（全局唯一，小写下划线，如 subject 学科 / stage 学段）',
+    dict_name  VARCHAR(50)  NOT NULL COMMENT '字典名称（中文展示名，如「学科」）',
+    remark     VARCHAR(200) DEFAULT NULL COMMENT '用途说明（写明本字典服务于哪几列）',
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
+    PRIMARY KEY (id),
+    -- 服务查询：按类型编码取字典类型（同时保证类型编码全局唯一）
+    UNIQUE KEY uk_dict_type (dict_type)
+) ENGINE = InnoDB COMMENT ='数据字典类型表';
+
+-- ------------------------------------------------------------
+-- 2. 数据字典项表：登记每个字典**有哪些取值**
+--    业务表存 item_value（字典码），前端展示 item_label（中文标签）
+-- ------------------------------------------------------------
+CREATE TABLE sys_dict_item (
+    id         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+    dict_type  VARCHAR(50) NOT NULL COMMENT '所属字典类型（sys_dict_type.dict_type）',
+    item_value VARCHAR(20) NOT NULL COMMENT '字典码（业务表实际存储的值，如 MATH）',
+    item_label VARCHAR(50) NOT NULL COMMENT '字典标签（前端展示的中文，如 数学）',
+    sort_no    INT         NOT NULL DEFAULT 0 COMMENT '排序号（前端下拉顺序，升序）',
+    enabled    TINYINT     NOT NULL DEFAULT 1 COMMENT '启用状态：1 启用 / 0 停用（停用项不可再选，历史数据仍按标签展示）',
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted    TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
+    PRIMARY KEY (id),
+    -- 服务查询：同一字典下字典码唯一（防重复登记）；最左前缀已覆盖「按 dict_type 列出全部字典项」，
+    -- 依规范 §4.1 最左前缀原则，不得再单建 idx_dict_type（冗余索引徒增写入开销）
+    UNIQUE KEY uk_type_value (dict_type, item_value)
+) ENGINE = InnoDB COMMENT ='数据字典项表';
+
+-- ============================================================
+-- 二、业务表
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 3. 用户表：师范生 / 教师 / 管理员
 -- ------------------------------------------------------------
 CREATE TABLE sys_user (
     id         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
     username   VARCHAR(50)  NOT NULL COMMENT '登录名（学号/工号），全局唯一',
     password   VARCHAR(100) NOT NULL COMMENT '密码（BCrypt 加密，定长 60 字符）',
     real_name  VARCHAR(50)  NOT NULL COMMENT '真实姓名',
-    role       VARCHAR(20)  NOT NULL COMMENT '角色：STUDENT / TEACHER / ADMIN',
-    major      VARCHAR(50)  DEFAULT NULL COMMENT '专业（师范生）',
-    grade      VARCHAR(20)  DEFAULT NULL COMMENT '年级',
+    role       VARCHAR(20)  NOT NULL COMMENT '角色（字典 user_role，值为字典码）',
+    major      VARCHAR(20)  DEFAULT NULL COMMENT '专业（字典 major，值为字典码；NULL 表示师范生尚未绑定，见 UC-S01）',
+    grade      VARCHAR(20)  DEFAULT NULL COMMENT '年级（字典 grade，值为字典码，取值口径为入学年份；NULL 表示尚未绑定）',
     created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
@@ -50,12 +101,12 @@ CREATE TABLE sys_user (
 ) ENGINE = InnoDB COMMENT ='用户表';
 
 -- ------------------------------------------------------------
--- 2. 班级表：教师建班、关联课程
+-- 4. 班级表：教师建班、关联课程
 -- ------------------------------------------------------------
 CREATE TABLE clazz (
     id         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
     name       VARCHAR(50) NOT NULL COMMENT '班级名称',
-    course     VARCHAR(50) NOT NULL COMMENT '课程（语文/数学/英语/思政/幼教等）',
+    course     VARCHAR(20) NOT NULL COMMENT '课程（字典 subject，值为字典码；课程与 task.subject 同域，共用一套学科字典）',
     teacher_id BIGINT      NOT NULL COMMENT '带班教师（sys_user.id）',
     created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -66,7 +117,7 @@ CREATE TABLE clazz (
 ) ENGINE = InnoDB COMMENT ='班级表';
 
 -- ------------------------------------------------------------
--- 3. 班级-学生关系表（多对多）
+-- 5. 班级-学生关系表（多对多）
 --    纯关系表：豁免 updated_at / deleted（见 docs/数据库设计规范.md 第 3 节白名单）
 -- ------------------------------------------------------------
 CREATE TABLE clazz_student (
@@ -82,20 +133,20 @@ CREATE TABLE clazz_student (
 ) ENGINE = InnoDB COMMENT ='班级-学生关系表';
 
 -- ------------------------------------------------------------
--- 4. 试讲任务表：教师发布（课时/学段/教材版本/评分标准/模式）
+-- 6. 试讲任务表：教师发布（课时/学段/教材版本/评分标准/模式）
 -- ------------------------------------------------------------
 CREATE TABLE task (
     id               BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
     title            VARCHAR(100) NOT NULL COMMENT '任务标题',
     clazz_id         BIGINT       NOT NULL COMMENT '发布到的班级（clazz.id）',
-    subject          VARCHAR(50)  NOT NULL COMMENT '学科',
-    stage            VARCHAR(20)  NOT NULL COMMENT '学段：小学 / 初中 / 高中',
-    textbook_version VARCHAR(50)  DEFAULT NULL COMMENT '教材版本（人教/北师大等）',
-    mode             VARCHAR(20)  NOT NULL COMMENT '训练模式：FREE 自由试讲 / SCENARIO 情景模拟 / STRUCTURED 结构化面试 / EXAM 模拟考核',
+    subject          VARCHAR(20)  NOT NULL COMMENT '学科（字典 subject，值为字典码）',
+    stage            VARCHAR(20)  NOT NULL COMMENT '学段（字典 stage，值为字典码）',
+    textbook_version VARCHAR(20)  DEFAULT NULL COMMENT '教材版本（字典 textbook_version，值为字典码；NULL 表示不限版本）',
+    mode             VARCHAR(20)  NOT NULL COMMENT '训练模式（字典 teach_mode，值为字典码；四要素定义见技术方案 2.2）',
     duration_minutes INT          NOT NULL COMMENT '规定时长（分钟，> 0）',
     deadline         DATETIME     DEFAULT NULL COMMENT '截止时间（NULL 表示不设截止，任务长期有效）',
     rubric_json      JSON         NOT NULL COMMENT '评分标准 JSON（维度 / 权重 / 知识点清单，见技术方案 6.2；可由 resource(type=RUBRIC) 模板复制而来。各维度 weight 必须 > 0，总分按 Σ权重 归一化，权重之和不必为 100）',
-    status           VARCHAR(20)  NOT NULL DEFAULT 'PUBLISHED' COMMENT '状态：DRAFT 草稿 / PUBLISHED 已发布 / CLOSED 已关闭',
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PUBLISHED' COMMENT '状态（字典 task_status，值为字典码）',
     created_by       BIGINT       NOT NULL COMMENT '发布教师 id（sys_user.id），固化实际发布人',
     created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -110,7 +161,7 @@ CREATE TABLE task (
 ) ENGINE = InnoDB COMMENT ='试讲任务表';
 
 -- ------------------------------------------------------------
--- 5. 试讲记录表：学生提交（试讲稿 + 环节时长 + 自评量表，音视频可选）
+-- 7. 试讲记录表：学生提交（试讲稿 + 环节时长 + 自评量表，音视频可选）
 -- ------------------------------------------------------------
 CREATE TABLE trial (
     id                   BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -122,7 +173,7 @@ CREATE TABLE trial (
     self_assessment_json JSON         DEFAULT NULL COMMENT '自评量表 JSON（10 项自评；普通话/教姿教态保底方案的数据来源，提交试讲时录入）',
     duration_actual      INT          DEFAULT NULL COMMENT '实际时长（分钟，>= 0；未录入时为 NULL）',
     stage_times_json     JSON         DEFAULT NULL COMMENT '各环节实测时长 JSON（key 为环节名，value 为秒）',
-    status               VARCHAR(20)  NOT NULL DEFAULT 'SUBMITTED' COMMENT '状态：DRAFT 草稿 / SUBMITTED 已提交 / EVALUATED 已评测',
+    status               VARCHAR(20)  NOT NULL DEFAULT 'SUBMITTED' COMMENT '状态（字典 trial_status，值为字典码）',
     created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
     updated_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted              TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
@@ -134,7 +185,7 @@ CREATE TABLE trial (
 ) ENGINE = InnoDB COMMENT ='试讲记录表';
 
 -- ------------------------------------------------------------
--- 6. 评测报告表：AI 评测引擎生成（试讲 1—1 报告）
+-- 8. 评测报告表：AI 评测引擎生成（试讲 1—1 报告）
 -- ------------------------------------------------------------
 CREATE TABLE evaluation_report (
     id                    BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -143,7 +194,7 @@ CREATE TABLE evaluation_report (
     dimension_scores_json JSON          NOT NULL COMMENT '六维分数 JSON（维度 key / 得分 / 权重）',
     issues_json           JSON          DEFAULT NULL COMMENT '问题定位 JSON（问题码 / 级别 / 定位详情）',
     suggestions_json      JSON          DEFAULT NULL COMMENT '改进建议 JSON（问题码 → 建议模板）',
-    evaluator_type        VARCHAR(20)   NOT NULL DEFAULT 'RULE' COMMENT '评测引擎类型：RULE / LLM（迭代 5 预留 ASR / POSTURE，与 media_analysis_json 同步启用）',
+    evaluator_type        VARCHAR(20)   NOT NULL DEFAULT 'RULE' COMMENT '评测引擎类型（字典 evaluator_type，值为字典码；迭代 5 预留 ASR / POSTURE，与 media_analysis_json 同步启用）',
     media_analysis_json   JSON          DEFAULT NULL COMMENT '语音识别 / 人体关键点原始数据 JSON（迭代 5；API 失败回退时为 NULL）',
     created_at            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评测时间',
     updated_at            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -154,30 +205,30 @@ CREATE TABLE evaluation_report (
 ) ENGINE = InnoDB COMMENT ='评测报告表';
 
 -- ------------------------------------------------------------
--- 7. 题库表：试讲题 / 结构化面试题 / 教资真题
+-- 9. 题库表：试讲题 / 结构化面试题 / 教资真题
 -- ------------------------------------------------------------
 CREATE TABLE question_bank (
-    id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-    subject     VARCHAR(50)  NOT NULL COMMENT '学科',
-    stage       VARCHAR(20)  NOT NULL COMMENT '学段：小学 / 初中 / 高中',
-    type        VARCHAR(20)  NOT NULL COMMENT '类型：TRIAL 试讲题 / STRUCTURED 结构化 / REAL 教资真题',
-    content     TEXT         NOT NULL COMMENT '题目内容',
-    answer_hint TEXT         DEFAULT NULL COMMENT '答题要点 / 参考答案提示',
-    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
+    id          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+    subject     VARCHAR(20) NOT NULL COMMENT '学科（字典 subject，值为字典码）',
+    stage       VARCHAR(20) NOT NULL COMMENT '学段（字典 stage，值为字典码）',
+    type        VARCHAR(20) NOT NULL COMMENT '类型（字典 question_type，值为字典码）',
+    content     TEXT        NOT NULL COMMENT '题目内容',
+    answer_hint TEXT        DEFAULT NULL COMMENT '答题要点 / 参考答案提示',
+    created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted     TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
     PRIMARY KEY (id),
     -- 服务查询：按学段 + 学科筛选题目
     KEY idx_subject_stage (subject, stage)
 ) ENGINE = InnoDB COMMENT ='题库表';
 
 -- ------------------------------------------------------------
--- 8. 资源表：教案/板书模板、优秀试讲范例、评分细则模板
+-- 10. 资源表：教案/板书模板、优秀试讲范例、评分细则模板
 -- ------------------------------------------------------------
 CREATE TABLE resource (
     id         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-    type       VARCHAR(20)  NOT NULL COMMENT '类型：LESSON_PLAN 教案 / BOARD 板书模板 / EXAMPLE 试讲范例 / RUBRIC 评分细则模板（管理员维护，教师发布任务时复制进 task.rubric_json）',
-    subject    VARCHAR(50)  NOT NULL COMMENT '学科（通用模板填「通用」）',
+    type       VARCHAR(20)  NOT NULL COMMENT '类型（字典 resource_type，值为字典码；RUBRIC 由管理员维护，教师发布任务时复制进 task.rubric_json）',
+    subject    VARCHAR(20)  NOT NULL COMMENT '学科（字典 subject，值为字典码；通用模板填 GENERAL）',
     title      VARCHAR(100) NOT NULL COMMENT '标题',
     content    TEXT         DEFAULT NULL COMMENT '文本内容（RUBRIC 类型时为评分细则 JSON）',
     file_path  VARCHAR(255) DEFAULT NULL COMMENT '附件路径（可选）',
@@ -190,7 +241,7 @@ CREATE TABLE resource (
 ) ENGINE = InnoDB COMMENT ='资源表';
 
 -- ------------------------------------------------------------
--- 9. 教师批阅表：试讲 1—N 批阅
+-- 11. 教师批阅表：试讲 1—N 批阅
 -- ------------------------------------------------------------
 CREATE TABLE review (
     id         BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -209,18 +260,18 @@ CREATE TABLE review (
 ) ENGINE = InnoDB COMMENT ='教师批阅表';
 
 -- ------------------------------------------------------------
--- 10. 达标证书表
+-- 12. 达标证书表
 --     只增不改的业务表：豁免 updated_at（见 docs/数据库设计规范.md 第 3 节白名单）
 -- ------------------------------------------------------------
 CREATE TABLE certificate (
-    id         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-    student_id BIGINT       NOT NULL COMMENT '学生 id（sys_user.id）',
-    task_id    BIGINT       NOT NULL COMMENT '任务 id（task.id）',
-    type       VARCHAR(50)  NOT NULL COMMENT '证书类型（教学表达 / 课堂互动 / 控场 / 时间管理）',
+    id         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+    student_id BIGINT      NOT NULL COMMENT '学生 id（sys_user.id）',
+    task_id    BIGINT      NOT NULL COMMENT '任务 id（task.id）',
+    type       VARCHAR(20) NOT NULL COMMENT '证书类型（字典 cert_type，值为字典码）',
     file_path  VARCHAR(255) NOT NULL COMMENT '证书文件路径',
-    issued_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '颁发时间',
-    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    deleted    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
+    issued_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '颁发时间（业务时间，补发时可回溯指定；正常颁发时等于 created_at）',
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间（审计列，记录入库时刻）',
+    deleted    TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
     PRIMARY KEY (id),
     -- 服务查询：学生的证书列表
     KEY idx_student (student_id),
@@ -241,17 +292,103 @@ CREATE TABLE certificate (
 -- 种子数据（演示用，迭代 2 起逐步补充）
 -- ============================================================
 
+-- 数据字典：全项目枚举与字典型列的取值权威源（列 COMMENT 不再重复罗列取值）
+INSERT INTO sys_dict_type (dict_type, dict_name, remark) VALUES
+('user_role',        '用户角色',     '服务的列：sys_user.role'),
+('major',            '专业',         '服务的列：sys_user.major（师范类专业）'),
+('grade',            '年级',         '服务的列：sys_user.grade（取值口径为入学年份）'),
+('subject',          '学科',         '服务的列：clazz.course / task.subject / question_bank.subject / resource.subject'),
+('stage',            '学段',         '服务的列：task.stage / question_bank.stage'),
+('textbook_version', '教材版本',     '服务的列：task.textbook_version'),
+('teach_mode',       '训练模式',     '服务的列：task.mode（四要素定义见技术方案 2.2）'),
+('task_status',      '任务状态',     '服务的列：task.status（流转权限归 task 模块，见技术方案 5.1 R-2）'),
+('trial_status',     '试讲状态',     '服务的列：trial.status（流转权限归 trial 模块，见技术方案 5.1 R-2）'),
+('evaluator_type',   '评测引擎类型', '服务的列：evaluation_report.evaluator_type'),
+('question_type',    '题目类型',     '服务的列：question_bank.type'),
+('resource_type',    '资源类型',     '服务的列：resource.type'),
+('cert_type',        '证书类型',     '服务的列：certificate.type（四类技能取自题目需求 9.1，前两类与评测维度 expression / interaction 对应，控场并入课堂互动维度）');
+
+INSERT INTO sys_dict_item (dict_type, item_value, item_label, sort_no) VALUES
+-- 用户角色
+('user_role',        'STUDENT',       '师范生',       1),
+('user_role',        'TEACHER',       '教师',         2),
+('user_role',        'ADMIN',         '管理员',       3),
+-- 专业
+('major',            'CHINESE_EDU',   '汉语言文学',   1),
+('major',            'MATH_EDU',      '数学与应用数学', 2),
+('major',            'ENGLISH_EDU',   '英语',         3),
+('major',            'POLITICS_EDU',  '思想政治教育', 4),
+('major',            'PRESCHOOL_EDU', '学前教育',     5),
+('major',            'PRIMARY_EDU',   '小学教育',     6),
+-- 年级（入学年份）
+('grade',            '2022',          '2022级',       1),
+('grade',            '2023',          '2023级',       2),
+('grade',            '2024',          '2024级',       3),
+('grade',            '2025',          '2025级',       4),
+('grade',            '2026',          '2026级',       5),
+-- 学科（clazz.course 与 task.subject 共用；通用模板资源用 GENERAL）
+('subject',          'CHINESE',       '语文',         1),
+('subject',          'MATH',          '数学',         2),
+('subject',          'ENGLISH',       '英语',         3),
+('subject',          'POLITICS',      '思政',         4),
+('subject',          'PRESCHOOL',     '幼教',         5),
+('subject',          'SCIENCE',       '科学',         6),
+('subject',          'ART',           '美术',         7),
+('subject',          'MUSIC',         '音乐',         8),
+('subject',          'GENERAL',       '通用',        99),
+-- 学段
+('stage',            'PRIMARY',       '小学',         1),
+('stage',            'JUNIOR',        '初中',         2),
+('stage',            'SENIOR',        '高中',         3),
+-- 教材版本
+('textbook_version', 'PEP',           '人教版',       1),
+('textbook_version', 'BNUP',          '北师大版',     2),
+('textbook_version', 'SJEP',          '苏教版',       3),
+('textbook_version', 'FLTRP',         '外研版',       4),
+-- 训练模式
+('teach_mode',       'FREE',          '自由试讲',     1),
+('teach_mode',       'SCENARIO',      '情景模拟',     2),
+('teach_mode',       'STRUCTURED',    '结构化面试',   3),
+('teach_mode',       'EXAM',          '模拟考核',     4),
+-- 任务状态
+('task_status',      'DRAFT',         '草稿',         1),
+('task_status',      'PUBLISHED',     '已发布',       2),
+('task_status',      'CLOSED',        '已关闭',       3),
+-- 试讲状态
+('trial_status',     'DRAFT',         '草稿',         1),
+('trial_status',     'SUBMITTED',     '已提交',       2),
+('trial_status',     'EVALUATED',     '已评测',       3),
+-- 评测引擎类型
+('evaluator_type',   'RULE',          '规则引擎',     1),
+('evaluator_type',   'LLM',           '大模型',       2),
+('evaluator_type',   'ASR',           '语音识别',     3),
+('evaluator_type',   'POSTURE',       '姿态识别',     4),
+-- 题目类型
+('question_type',    'TRIAL',         '试讲题',       1),
+('question_type',    'STRUCTURED',    '结构化面试题', 2),
+('question_type',    'REAL',          '教资真题',     3),
+-- 资源类型
+('resource_type',    'LESSON_PLAN',   '教案',         1),
+('resource_type',    'BOARD',         '板书模板',     2),
+('resource_type',    'EXAMPLE',       '试讲范例',     3),
+('resource_type',    'RUBRIC',        '评分细则模板', 4),
+-- 证书类型
+('cert_type',        'EXPRESSION',    '教学表达',     1),
+('cert_type',        'INTERACTION',   '课堂互动',     2),
+('cert_type',        'CONTROL',       '课堂控场',     3),
+('cert_type',        'TIME',          '时间管理',     4);
+
 -- 题库：小学数学 / 语文试讲题与结构化面试题示例
 INSERT INTO question_bank (subject, stage, type, content, answer_hint) VALUES
-('数学', '小学', 'TRIAL', '试讲题目：《分数的初步认识》（人教版三年级上册）\n要求：10 分钟无生试讲，含导入、新授、练习、小结、作业五环节。',
+('MATH', 'PRIMARY', 'TRIAL', '试讲题目：《分数的初步认识》（人教版三年级上册）\n要求：10 分钟无生试讲，含导入、新授、练习、小结、作业五环节。',
  '导入可用分月饼情境；新授突出"平均分"概念；练习设计由浅入深；注意使用直观教具语言。'),
-('数学', '小学', 'STRUCTURED', '结构化面试：上课时有学生当众指出你的板书错误，你怎么办？',
+('MATH', 'PRIMARY', 'STRUCTURED', '结构化面试：上课时有学生当众指出你的板书错误，你怎么办？',
  '答题思路：① 保持冷静、坦然承认；② 表扬学生认真观察；③ 顺势引导学生共同纠错；④ 课后反思备课与板书检查习惯。'),
-('语文', '小学', 'TRIAL', '试讲题目：《观潮》（人教版四年级上册）第二课时\n要求：8 分钟试讲，重点讲"潮来时"段落，设计一处 [板书]。',
+('CHINESE', 'PRIMARY', 'TRIAL', '试讲题目：《观潮》（人教版四年级上册）第二课时\n要求：8 分钟试讲，重点讲"潮来时"段落，设计一处 [板书]。',
  '抓住"声音—样子"两条线索；重点词句品读（闷雷滚动、白浪翻滚）；朗读指导要有层次。');
 
 -- 资源：教案模板、板书模板、评分细则模板示例
 INSERT INTO resource (type, subject, title, content) VALUES
-('LESSON_PLAN', '通用', '试讲教案通用模板', '一、教学目标（知识与技能/过程与方法/情感态度价值观）\n二、教学重难点\n三、教学过程（导入—新授—练习—小结—作业，标注各环节时长）\n四、板书设计\n五、教学反思'),
-('BOARD', '通用', '板书设计要点', '1. 结构清晰：主板书（课题+知识框架）与副板书（临时演算）分区；\n2. 书写规范：笔顺正确、大小适中、不用繁体/异体字；\n3. 与讲解同步：边讲边写，不背对学生长时间书写。'),
-('RUBRIC', '通用', '试讲评分细则默认模板', '{"dimensions":[{"key":"content","name":"教学内容","weight":25},{"key":"expression","name":"教学表达","weight":25},{"key":"posture","name":"教姿教态","weight":15},{"key":"interaction","name":"课堂互动","weight":15},{"key":"board","name":"板书呈现","weight":10},{"key":"time","name":"时间管理","weight":10}]}');
+('LESSON_PLAN', 'GENERAL', '试讲教案通用模板', '一、教学目标（知识与技能/过程与方法/情感态度价值观）\n二、教学重难点\n三、教学过程（导入—新授—练习—小结—作业，标注各环节时长）\n四、板书设计\n五、教学反思'),
+('BOARD', 'GENERAL', '板书设计要点', '1. 结构清晰：主板书（课题+知识框架）与副板书（临时演算）分区；\n2. 书写规范：笔顺正确、大小适中、不用繁体/异体字；\n3. 与讲解同步：边讲边写，不背对学生长时间书写。'),
+('RUBRIC', 'GENERAL', '试讲评分细则默认模板', '{"dimensions":[{"key":"content","name":"教学内容","weight":25},{"key":"expression","name":"教学表达","weight":25},{"key":"posture","name":"教姿教态","weight":15},{"key":"interaction","name":"课堂互动","weight":15},{"key":"board","name":"板书呈现","weight":10},{"key":"time","name":"时间管理","weight":10}]}');
