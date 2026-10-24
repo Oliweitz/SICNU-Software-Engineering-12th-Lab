@@ -1,17 +1,21 @@
 package com.example.security;
 
+import com.example.common.BizException;
+import com.example.common.ResultCode;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
  * JWT 工具：签发与解析令牌（配置项见 application.yml 的 jwt.* 节）
  *
- * <p>TODO 迭代 1 实现：jjwt 依赖已引入（见 pom.xml）——
- *
- * <ul>
- *   <li>{@link #generateToken(LoginUser)}：按 secret / expireHours 签发 HS256 令牌
- *   <li>{@link #parseToken(String)}：校验签名与有效期，返回 {@link LoginUser}
- * </ul>
+ * <p>载荷只放身份信息（id / username / realName）：角色与权限码由 {@code RbacService} 每请求现查， 授权调整即时生效，不会因旧令牌携带旧权限而越权。
  */
 @Component
 public class JwtUtil {
@@ -22,13 +26,40 @@ public class JwtUtil {
     @Value("${jwt.expire-hours}")
     private long expireHours;
 
-    /** TODO 迭代 1：签发令牌，载荷含 id / username / role / clazzId */
+    /** 签发令牌（HS256，密钥由 jwt.secret 派生，长度须 ≥ 32 字节） */
     public String generateToken(LoginUser user) {
-        throw new UnsupportedOperationException("迭代 1 实现：JWT 签发");
+        SecretKey key = signKey();
+        long now = System.currentTimeMillis();
+        return Jwts.builder()
+                .subject(String.valueOf(user.getId()))
+                .claim("username", user.getUsername())
+                .claim("realName", user.getRealName())
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + expireHours * 3600_000L))
+                .signWith(key)
+                .compact();
     }
 
-    /** TODO 迭代 1：解析并校验令牌；签名无效/过期时抛 BizException(UNAUTHORIZED) */
+    /** 解析并校验令牌；签名无效 / 过期 / 格式错误统一抛 UNAUTHORIZED */
     public LoginUser parseToken(String token) {
-        throw new UnsupportedOperationException("迭代 1 实现：JWT 解析");
+        try {
+            Claims claims =
+                    Jwts.parser()
+                            .verifyWith(signKey())
+                            .build()
+                            .parseSignedClaims(token)
+                            .getPayload();
+            return LoginUser.builder()
+                    .id(Long.valueOf(claims.getSubject()))
+                    .username(claims.get("username", String.class))
+                    .realName(claims.get("realName", String.class))
+                    .build();
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BizException(ResultCode.UNAUTHORIZED, "令牌无效或已过期");
+        }
+    }
+
+    private SecretKey signKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 }

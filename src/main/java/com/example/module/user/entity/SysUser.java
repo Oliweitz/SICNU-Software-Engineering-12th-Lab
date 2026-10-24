@@ -4,11 +4,14 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.example.common.enums.Role;
 import java.time.LocalDateTime;
 import lombok.Data;
 
-/** 用户实体（sys_user 表，见 docs/技术方案.md 第 5 节 / docs/init.sql） */
+/**
+ * 用户实体（sys_user 表，见 docs/技术方案.md 第 5 节 / docs/init.sql）
+ *
+ * <p>角色不在本表：V3 起改为 RBAC 多对多（sys_user_role），用 {@code RbacService} 查询。
+ */
 @Data
 @TableName("sys_user")
 public class SysUser {
@@ -25,9 +28,6 @@ public class SysUser {
 
     /** 真实姓名 */
     private String realName;
-
-    /** 角色：STUDENT / TEACHER / ADMIN */
-    private Role role;
 
     /** 专业（师范生） */
     private String major;

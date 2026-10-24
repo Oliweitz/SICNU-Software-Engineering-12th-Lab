@@ -29,7 +29,7 @@
 | [技术方案.md](docs/技术方案.md) | 需求分析／架构／数据库摘要／评测引擎／接口／迭代计划 | 需求与架构的**唯一权威源** |
 | [数据库设计规范.md](docs/数据库设计规范.md) | 命名／类型／索引／约束／字符集／注释／逻辑删除 / 变更流程 / **数据字典** | 数据库设计的**唯一权威源** |
 | [init.sql](docs/init.sql) | 建库建表 + 种子数据（含**数据字典**两表及其取值） | **表结构与枚举取值的唯一权威源** |
-| [migration/](docs/migration/) | 已有数据环境的增量脚本（`V2__data_dict.sql`） | 增量变更记录 |
+| [migration/](docs/migration/) | 已有数据环境的增量变更脚本（V2 已合并至 `init.sql`；V3 为 RBAC 权限模型） | 增量变更记录 |
 | [代码规范.md](docs/代码规范.md) | Java 分层／命名／异常日志／SQL／前端／测试规范 | 编码规约 |
 | [Git工作流与提交规范.md](docs/Git工作流与提交规范.md) | 分支模型／提交信息／评审流程／常见问题 | 协作规约 |
 | [环境配置.md](docs/环境配置.md) | 环境准备、组件安装、常见问题排查 | 环境说明 |
@@ -104,13 +104,13 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 │   ├── 环境配置.md                 # 环境准备与常见问题
 │   ├── 代码规范.md                 # Java/前端/SQL 编码规范
 │   ├── Git工作流与提交规范.md       # 分支模型/提交信息/评审流程
-│   ├── migration/                 # 已有数据环境的增量脚本（V2__data_dict.sql）
+│   ├── migration/                 # 增量变更脚本目录（V2 已合并至 init.sql；V3__rbac.sql 为 RBAC 权限模型）
 │   └── init.sql                   # 建库建表脚本 + 种子数据（表结构与枚举取值权威源）
 ├── src/main/java/com/example/
 │   ├── Application.java           # 启动类
 │   ├── common/                    # 统一响应 Result / 异常 / 分页 / 错误码 / 角色枚举
 │   ├── config/                    # Security / MyBatis-Plus 分页 / CORS 配置
-│   ├── security/                  # JWT 工具、认证过滤器、登录用户上下文（迭代 1 实现）
+│   ├── security/                  # JWT 工具 / 认证过滤器（加载 RBAC 权限）/ 登录用户上下文
 │   └── module/                    # 业务域分包，12 个模块
 │       ├── dict/                  # 数据字典：全项目枚举取值的权威源（当前为包骨架）
 │       ├── user/                  # 用户与登录（迭代 1）
@@ -142,26 +142,30 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 | 工程骨架、统一响应/异常/分页 | ✅ 完成 |
 | 三份规范（代码/数据库/Git）+ 环境文档 | ✅ 完成 |
 | `init.sql` 建库建表 + 种子数据 | ✅ 完成（已在 MySQL 8.0.45 实跑并二次重跑验证） |
-| **数据字典**（枚举取值收口到 `sys_dict_item`） | ✅ 完成并已落库（`init.sql` + 规范 §12 + `migration/V2__data_dict.sql`；实库 110 列逐项比对一致） |
+| **数据字典**（枚举取值收口到 `sys_dict_item`） | ✅ 完成并已落库（`init.sql` + 规范 §12；原 `V2__data_dict.sql` 已合并至 `init.sql`；实库 110 列逐项比对一致） |
 | 业务模块骨架（12 个域） | ✅ 完成 |
+| **登录与 RBAC 权限**（`sys_role` / `sys_permission` / `sys_user_role` / `sys_role_permission`） | ✅ 完成（JWT 登录、权限码鉴权、角色授权接口；表数 12 → 16） |
 | **AI 评测引擎地基** | ✅ 完成（属迭代 2 内容，已提前落地） |
-| 身份认证与课程管理 | ⏳ 迭代 1，`security` 与 `user` 目前均为骨架 |
+| 课程管理 | ⏳ 迭代 1，`clazz` 模块仍为骨架 |
 
 > **数据库变更流程：一条龙，不留尾巴。** 改 `docs/init.sql` → 同步文档 → **立即在实库执行**
 > → 比对确认实库与 `init.sql` 一致。**只改脚本不落库视为未完成**——脚本与实库两张皮，
 > 下一个人 clone 下来跑出的结果和当前演示环境不一样，是比写错 SQL 更隐蔽的问题。
 >
-> - **已有数据的库**：跑增量脚本，**不要重跑 `init.sql`**（它开头是 `DROP DATABASE`）
->   ```bash
->   mysql -u root -p ai_trial_platform < docs/migration/V2__data_dict.sql
->   ```
+> - **已有数据的库**：执行 `docs/migration/` 下对应版本的增量脚本，**不要重跑 `init.sql`**（它开头是 `DROP DATABASE`）。
+>   数据字典变更（原 `V2__data_dict.sql`）已合并至 `init.sql`；老库若从未执行过原 V2，
+>   请从 Git 历史取回该版本脚本执行一次。
+>   **RBAC 变更**（`sys_user.role` → `sys_user_role` 多对多）请对老库执行 **`docs/migration/V3__rbac.sql`**：
+>   它建 4 张权限表、按业务码迁移存量角色、再删除 `sys_user.role` 列与 `user_role` 字典。
 >   增量脚本一律不含 `DROP`、**可重复执行**，末尾带校验查询（**预期返回 0 行**；
 >   有输出说明库里存在字典外的旧取值，人工确认后补一条 `UPDATE` 再重跑）。
-> - **全新环境**：直接跑 `docs/init.sql`。
+> - **全新环境**：直接跑 `docs/init.sql`（已含 RBAC 四表与授权种子，**无需**再跑 V3）。
 >
-> 2026-09-22 的数据字典变更已按此流程落库：`ai_trial_platform` 由 `V2__data_dict.sql` 收敛，
+> 2026-09-22 的数据字典变更已按此流程落库：`ai_trial_platform` 由原 `V2__data_dict.sql`（现合并至 `init.sql`）收敛，
 > **12 张表 / 110 列的类型、可空、注释与全部索引均与 `init.sql` 逐项比对通过**，
 > 13 本字典 55 个取值、种子数据中文无乱码。
+> 2026-10-24 的 RBAC 改造后，`init.sql` 为 **16 张表**（系统类 7 + 业务类 9），
+> 权限点 19 个，角色授权数 `STUDENT` 7 / `TEACHER` 10 / `ADMIN` 19。
 
 **评测引擎地基**是本工程目前完成度最高的部分，包含：
 
