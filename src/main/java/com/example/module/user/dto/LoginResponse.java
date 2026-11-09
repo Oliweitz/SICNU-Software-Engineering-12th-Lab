@@ -16,6 +16,12 @@ public class LoginResponse {
     /** JWT 令牌（请求头 Authorization: Bearer <token>） */
     private String token;
 
+    /** 令牌类型，固定 Bearer */
+    private String tokenType;
+
+    /** 有效期（秒） */
+    private long expiresIn;
+
     /** 用户 id */
     private Long userId;
 
@@ -24,6 +30,12 @@ public class LoginResponse {
 
     /** 真实姓名 */
     private String realName;
+
+    /** 脱敏手机号（未绑定为 null） */
+    private String phoneMasked;
+
+    /** 脱敏邮箱（未绑定为 null） */
+    private String emailMasked;
 
     /** 角色码列表 */
     private List<String> roles;

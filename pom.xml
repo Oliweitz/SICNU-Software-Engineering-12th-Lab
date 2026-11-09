@@ -28,6 +28,7 @@
     <mybatis-plus.version>3.5.12</mybatis-plus.version>
     <jjwt.version>0.12.6</jjwt.version>
     <easyexcel.version>4.0.3</easyexcel.version>
+    <hutool.version>5.8.32</hutool.version>
     <!-- 显式锁定 Lombok：父工程默认版本在 JDK 23+ 下注解处理器可能失效，锁定兼容版本 -->
     <lombok.version>1.18.48</lombok.version>
     <spotless.version>2.44.5</spotless.version>
@@ -110,6 +111,19 @@
       <groupId>com.alibaba</groupId>
       <artifactId>easyexcel</artifactId>
       <version>${easyexcel.version}</version>
+    </dependency>
+
+    <!-- 图形验证码（登录验证码，Hutool Captcha，轻量无额外运行时依赖） -->
+    <dependency>
+      <groupId>cn.hutool</groupId>
+      <artifactId>hutool-captcha</artifactId>
+      <version>${hutool.version}</version>
+    </dependency>
+
+    <!-- 邮件验证码（真实 SMTP 通道；默认 mock，不配置 spring.mail.host 也不影响启动） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
     </dependency>
 
     <!-- Lombok：减少样板代码（IDE 需安装 Lombok 插件；版本见上方 properties） -->

@@ -1,6 +1,8 @@
 package com.example.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
@@ -19,11 +21,22 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** 业务异常：使用异常自带的错误码与提示 */
+    /**
+     * 业务异常：使用异常自带的错误码与提示
+     *
+     * <p>认证/授权类业务异常同时映射为 HTTP 401/403（与 Security 过滤器链的返回口径一致， 见 docs/技术方案.md §7）；其余业务错误保持 HTTP
+     * 200，由前端按 body.code 提示。
+     */
     @ExceptionHandler(BizException.class)
-    public Result<Void> handleBizException(BizException e) {
+    public ResponseEntity<Result<Void>> handleBizException(BizException e) {
         log.warn("业务异常: code={}, message={}", e.getResultCode().getCode(), e.getMessage());
-        return Result.fail(e.getResultCode(), e.getMessage());
+        HttpStatus status =
+                switch (e.getResultCode()) {
+                    case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+                    case FORBIDDEN -> HttpStatus.FORBIDDEN;
+                    default -> HttpStatus.OK;
+                };
+        return ResponseEntity.status(status).body(Result.fail(e.getResultCode(), e.getMessage()));
     }
 
     /**
@@ -62,10 +75,10 @@ public class GlobalExceptionHandler {
         return Result.fail(ResultCode.METHOD_NOT_ALLOWED);
     }
 
-    /** 无权限访问（Spring Security 抛出的访问拒绝异常） */
+    /** 无权限访问（方法级 @PreAuthorize 拒绝）；HTTP 403 与 docs/技术方案.md §7 一致 */
     @ExceptionHandler(AccessDeniedException.class)
-    public Result<Void> handleAccessDenied(AccessDeniedException e) {
-        return Result.fail(ResultCode.FORBIDDEN);
+    public ResponseEntity<Result<Void>> handleAccessDenied(AccessDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.fail(ResultCode.FORBIDDEN));
     }
 
     /** 静态资源/接口路径不存在（区分 404 与 500） */

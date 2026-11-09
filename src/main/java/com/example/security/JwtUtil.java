@@ -26,7 +26,12 @@ public class JwtUtil {
     @Value("${jwt.expire-hours}")
     private long expireHours;
 
-    /** 签发令牌（HS256，密钥由 jwt.secret 派生，长度须 ≥ 32 字节） */
+    /** 令牌有效期（秒），供登录响应回显 */
+    public long getExpireSeconds() {
+        return expireHours * 3600L;
+    }
+
+    /** 签发令牌（HMAC-SHA，具体 HS256/HS384/HS512 由 jwt.secret 长度决定，至少 32 字节） */
     public String generateToken(LoginUser user) {
         SecretKey key = signKey();
         long now = System.currentTimeMillis();

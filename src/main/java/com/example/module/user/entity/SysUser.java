@@ -23,7 +23,7 @@ public class SysUser {
     /** 登录名（学号/工号），唯一 */
     private String username;
 
-    /** 密码（BCrypt 加密） */
+    /** 密码（BCrypt 加密，盐值内嵌在哈希串中） */
     private String password;
 
     /** 真实姓名 */
@@ -34,6 +34,12 @@ public class SysUser {
 
     /** 年级 */
     private String grade;
+
+    /** 手机号（验证码登录/找回密码） */
+    private String phone;
+
+    /** 邮箱（验证码登录/找回密码） */
+    private String email;
 
     /** 创建时间（数据库默认值，插入时无需赋值） */
     private LocalDateTime createdAt;
