@@ -3,7 +3,7 @@ package com.example.module.user.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
-/** 登录请求（POST /api/v1/auth/login） */
+/** 密码登录请求（POST /api/v1/auth/login） */
 @Data
 public class LoginRequest {
 
@@ -14,4 +14,12 @@ public class LoginRequest {
     /** 明文密码（服务端与 BCrypt 哈希比对，不落库） */
     @NotBlank(message = "密码不能为空")
     private String password;
+
+    /** 图形验证码标识 */
+    @NotBlank(message = "图形验证码不能为空")
+    private String captchaId;
+
+    /** 图形验证码 */
+    @NotBlank(message = "图形验证码不能为空")
+    private String captchaCode;
 }

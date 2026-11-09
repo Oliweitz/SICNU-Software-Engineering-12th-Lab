@@ -16,6 +16,16 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
 
+auth:
+  captcha:
+    # 开发期把图形验证码明文随响应返回，方便前后端联调与课堂演示；生产必须为 false
+    expose-in-response: true
+  code:
+    # 开发期把验证码随响应返回，方便前后端联调与课堂演示；生产必须为 false
+    expose-in-response: true
+  seed:
+    enabled: true
+
 logging:
   level:
     com.example: debug

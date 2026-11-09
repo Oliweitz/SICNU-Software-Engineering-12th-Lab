@@ -32,4 +32,11 @@ public interface RbacService {
 
     /** 整体覆盖某角色的权限点集合（管理员操作，事务内先删后插） */
     void replaceRolePermissions(Role role, List<Long> permissionIds);
+
+    /**
+     * 给用户追加一个角色（幂等；已持有该角色时不重复插入）
+     *
+     * <p>注册默认分配 STUDENT，演示账号初始化按角色写入。
+     */
+    void assignRole(Long userId, Role role);
 }

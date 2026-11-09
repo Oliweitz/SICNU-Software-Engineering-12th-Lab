@@ -33,7 +33,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * <p>无状态会话 + JWT 过滤器；方法级鉴权由 {@code @EnableMethodSecurity} 开启， 业务接口统一用
  * {@code @PreAuthorize("hasAuthority('<权限码>')")}，权限码来源见 sys_permission。
  *
- * <p>白名单：登录接口、健康检查、错误转发。其余接口一律要求已认证。
+ * <p>白名单：认证接口（登录/注册/验证码/找回密码/统一认证）、健康检查、错误转发。 其余接口一律要求已认证。
  */
 @Configuration
 @EnableWebSecurity
@@ -83,7 +83,15 @@ public class SecurityConfig {
                                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                                         .permitAll()
                                         .requestMatchers(
-                                                "/api/v1/auth/login", "/actuator/health", "/error")
+                                                "/api/v1/auth/captcha",
+                                                "/api/v1/auth/login",
+                                                "/api/v1/auth/login/code",
+                                                "/api/v1/auth/code/send",
+                                                "/api/v1/auth/register",
+                                                "/api/v1/auth/password/reset",
+                                                "/api/v1/auth/cas/**",
+                                                "/actuator/health",
+                                                "/error")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())

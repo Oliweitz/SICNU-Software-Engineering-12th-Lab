@@ -51,6 +51,50 @@ jwt:
   token-prefix: "Bearer "
 
 # ------------------------------------------------------------
+# 认证与验证码（登录 / 注册 / 找回密码）
+# 设计说明见 docs/认证与授权设计.md
+# ------------------------------------------------------------
+auth:
+  captcha:
+    # 图形验证码有效期（分钟），一次性使用
+    expire-minutes: 5
+    # 开发期是否在接口响应里回传验证码明文（生产必须关闭）
+    expose-in-response: false
+  code:
+    # 短信/邮箱验证码有效期（分钟），一次性使用
+    expire-minutes: 5
+    # 同一目标、同一场景的重发冷却（秒）
+    resend-seconds: 60
+    # 单个验证码允许的最大校验次数，超过即作废
+    max-verify-attempts: 5
+    # 开发期是否在接口响应里回传验证码（仅 dev 开启，生产必须关闭）
+    expose-in-response: false
+    sms:
+      # mock = 验证码打印到日志；http = 调用自建短信网关
+      provider: ${SMS_PROVIDER:mock}
+      http-url: ${SMS_HTTP_URL:}
+      http-token: ${SMS_HTTP_TOKEN:}
+    mail:
+      # mock = 验证码打印到日志；smtp = 走 spring.mail.* 真实发信
+      provider: ${MAIL_PROVIDER:mock}
+      from: ${MAIL_FROM:no-reply@ai-trial.local}
+  login:
+    # 连续失败锁定策略（内存计数，重启清零）
+    max-failures: 5
+    lock-minutes: 15
+  cas:
+    # mock = 内置模拟统一身份认证；real = 对接学校 CAS Server
+    mode: ${CAS_MODE:mock}
+    server-url: ${CAS_SERVER_URL:}
+    # CAS 回调地址（必须与学校 CAS 登记的一致）
+    service-url: ${CAS_SERVICE_URL:http://localhost:8080/api/v1/auth/cas/callback}
+    # 登录成功后前端路由
+    frontend-callback-url: ${FRONTEND_URL:http://localhost:5173/sso-callback}
+  seed:
+    # 是否在启动时创建演示账号（仅开发环境开启）
+    enabled: false
+
+# ------------------------------------------------------------
 # 评测引擎配置（对应 evaluate 模块，迭代 2 使用）
 # 实现可插拔：rule = 规则引擎（默认，零依赖可解释）；llm = 大模型增强（需 API Key）
 # ------------------------------------------------------------

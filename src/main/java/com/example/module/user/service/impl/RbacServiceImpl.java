@@ -191,6 +191,29 @@ public class RbacServiceImpl implements RbacService {
         log.info("角色权限已更新: role={}, permissions={}", role, Set.copyOf(distinctIds));
     }
 
+    @Override
+    @Transactional
+    public void assignRole(Long userId, Role role) {
+        SysRole target =
+                roleMapper.selectOne(
+                        Wrappers.<SysRole>lambdaQuery().eq(SysRole::getRoleCode, role.name()));
+        if (target == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "角色不存在：" + role.name());
+        }
+        Long exists =
+                userRoleMapper.selectCount(
+                        Wrappers.<SysUserRole>lambdaQuery()
+                                .eq(SysUserRole::getUserId, userId)
+                                .eq(SysUserRole::getRoleId, target.getId()));
+        if (exists != null && exists > 0) {
+            return;
+        }
+        SysUserRole relation = new SysUserRole();
+        relation.setUserId(userId);
+        relation.setRoleId(target.getId());
+        userRoleMapper.insert(relation);
+    }
+
     private List<Long> listRoleIds(Long userId) {
         return userRoleMapper
                 .selectList(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, userId))

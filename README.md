@@ -1,7 +1,7 @@
 # 师范专业 AI 试讲台系统
 
 > 软件工程课程设计 · 2024 级 · 选题：**师范专业 AI 试讲台系统**
-> 当前里程碑 `v0.1.0-iter0` · 单元测试 28/28 通过 · 分支 `develop`
+> 当前里程碑 `v0.1.0-iter1`（认证与授权完成）· 单元测试 48/48 通过 · 分支 `main`
 
 面向师范类专业学生的 AI 虚拟试讲训练与考核平台：用虚拟学生 + AI 多维度评测替代/辅助真实课堂试讲，
 覆盖课前磨课、技能训练、教学评价、达标认证全流程。适用场景：微格教学、教师资格证面试训练、
@@ -14,7 +14,7 @@
 | 后端 | Spring Boot 3.5.4 + MyBatis-Plus 3.5.12 + Spring Security(JWT, jjwt 0.12.6) |
 | 数据库 | MySQL 8.x（本工程在 8.0.45 上验证；Redis 可选） |
 | 实时通信 | Spring WebSocket（虚拟课堂文字事件流） |
-| 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts（迭代 2 引入） |
+| 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts（登录/注册/找回密码/工作台已落地） |
 | 构建 | Maven 3.9.x / JDK 17 编译目标（21、24 等更高版本同样兼容）/ JUnit 5 |
 | 工程约束 | Spotless（Google Java Format AOSP，4 空格）+ EditorConfig + commit-msg 钩子 |
 
@@ -22,14 +22,15 @@
 
 ## 文档导航
 
-本工程共 6 份文档，**各自承担不同的权威角色**，改代码前请先确认改哪一份：
+本工程文档**各自承担不同的权威角色**，改代码前请先确认改哪一份：
 
 | 文档 | 内容 | 权威性 |
 |---|---|---|
 | [技术方案.md](docs/技术方案.md) | 需求分析／架构／数据库摘要／评测引擎／接口／迭代计划 | 需求与架构的**唯一权威源** |
 | [数据库设计规范.md](docs/数据库设计规范.md) | 命名／类型／索引／约束／字符集／注释／逻辑删除 / 变更流程 / **数据字典** | 数据库设计的**唯一权威源** |
 | [init.sql](docs/init.sql) | 建库建表 + 种子数据（含**数据字典**两表及其取值） | **表结构与枚举取值的唯一权威源** |
-| [migration/](docs/migration/) | 已有数据环境的增量变更脚本（V2 已合并至 `init.sql`；V3 为 RBAC 权限模型） | 增量变更记录 |
+| [migration/](docs/migration/) | 已有数据环境的增量变更脚本（V2 已合并至 `init.sql`；V3 RBAC；V4 认证字段） | 增量变更记录 |
+| [认证与授权设计.md](docs/认证与授权设计.md) | 登录流程、四种登录方式、验证码、注册/找回密码、统一提示、CAS 与 RBAC | 认证与授权的**实现与验收说明** |
 | [代码规范.md](docs/代码规范.md) | Java 分层／命名／异常日志／SQL／前端／测试规范 | 编码规约 |
 | [Git工作流与提交规范.md](docs/Git工作流与提交规范.md) | 分支模型／提交信息／评审流程／常见问题 | 协作规约 |
 | [环境配置.md](docs/环境配置.md) | 环境准备、组件安装、常见问题排查 | 环境说明 |
@@ -62,7 +63,29 @@ mvn spring-boot:run
 
 # 4. 健康检查
 curl http://localhost:8080/actuator/health
+
+# 5. 启动前端（5173，另开一个终端）
+cd frontend
+npm install
+npm run dev
+# 浏览器访问 http://localhost:5173
 ```
+
+**演示账号（仅 dev 自动创建，生产必须关闭 `auth.seed.enabled` 并修改密码）**：
+
+| 账号 | 密码 | 角色 | 手机号 | 邮箱 |
+|---|---|---|---|---|
+| admin | admin123 | 管理员 | 13900000000 | admin@example.com |
+| teacher | teacher123 | 教师 | 13900000001 | teacher@example.com |
+| student | student123 | 师范生 | 13900000002 | student@example.com |
+
+登录方式：账号密码（图形验证码）、手机短信验证码、邮箱验证码、统一身份认证（模拟 CAS）。
+开发环境验证码会打印到后端日志，并随接口响应返回 `debugCode`，方便联调；生产必须关闭
+`auth.code.expose-in-response` / `auth.captcha.expose-in-response`。
+
+> **本机若安装了禅道**：其自带的 MariaDB 服务 `mysqlzt` 会占用 3306，导致项目 MySQL 8（`MYSQL80`）无法启动。
+> 需先停止 `mysqlzt` 再启动 `MYSQL80`（管理员 PowerShell）：
+> `Stop-Service mysqlzt -Force; Start-Service MYSQL80`。详见 [docs/环境配置.md](docs/环境配置.md) 3.1 节。
 
 > **PowerShell 用户注意两处语法差异**：① PowerShell 不支持 `<` 输入重定向
 > （报「`<`运算符是为将来使用而保留的」），第 1 步改用 mysql 客户端内置的 `source`：
@@ -83,7 +106,8 @@ curl http://localhost:8080/actuator/health
 ## 常用命令
 
 ```bash
-mvn test                # 运行单元测试（当前 28/28 通过）
+mvn test                # 运行单元测试（当前 48/48 通过）
+cd frontend && npm run build   # 前端类型检查 + 生产构建
 mvn package             # 打包可执行 jar
 mvn spotless:apply      # 提交前格式化代码（必做）
 mvn spotless:check      # 检查格式是否合规（CI 使用）
@@ -104,16 +128,22 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 │   ├── 环境配置.md                 # 环境准备与常见问题
 │   ├── 代码规范.md                 # Java/前端/SQL 编码规范
 │   ├── Git工作流与提交规范.md       # 分支模型/提交信息/评审流程
-│   ├── migration/                 # 增量变更脚本目录（V2 已合并至 init.sql；V3__rbac.sql 为 RBAC 权限模型）
+│   ├── 认证与授权设计.md            # 四种登录方式/验证码/注册找回/RBAC/统一提示
+│   ├── migration/                 # 增量变更脚本（V2 已合并至 init.sql；V3 RBAC；V4 手机/邮箱字段）
 │   └── init.sql                   # 建库建表脚本 + 种子数据（表结构与枚举取值权威源）
+├── frontend/                      # Vue 3 前端（登录/注册/找回密码/SSO 回调/工作台）
+│   ├── src/api/                   # axios 实例 + 认证接口
+│   ├── src/stores/auth.ts         # 登录态与权限（Pinia + localStorage）
+│   ├── src/router/                # 路由与登录守卫
+│   └── src/views/                 # Login / Register / ForgotPassword / SsoCallback / Home
 ├── src/main/java/com/example/
 │   ├── Application.java           # 启动类
-│   ├── common/                    # 统一响应 Result / 异常 / 分页 / 错误码 / 角色枚举
-│   ├── config/                    # Security / MyBatis-Plus 分页 / CORS 配置
+│   ├── common/                    # 统一响应 Result / 异常 / 分页 / 错误码 / 脱敏工具 / 角色枚举
+│   ├── config/                    # Security / AuthProperties / DataInitializer / MyBatis-Plus / CORS
 │   ├── security/                  # JWT 工具 / 认证过滤器（加载 RBAC 权限）/ 登录用户上下文
 │   └── module/                    # 业务域分包，12 个模块
 │       ├── dict/                  # 数据字典：全项目枚举取值的权威源（当前为包骨架）
-│       ├── user/                  # 用户与登录（迭代 1）
+│       ├── user/                  # 用户与认证：登录/注册/验证码/CAS/RBAC（迭代 1）
 │       ├── clazz/                 # 班级、课程、成员关系（迭代 1）
 │       ├── task/                  # 试讲任务发布与领取（迭代 2）
 │       ├── trial/                 # 试讲提交、环节时长、录制（迭代 2/4）
@@ -131,7 +161,8 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 │   └── mapper/                    # MyBatis XML（迭代 1 起）
 └── src/test/java/com/example/     # 单元测试，与主结构同包镜像
     ├── ApplicationSmokeTest.java
-    ├── common/                    # Result / PageResult / BizException
+    ├── common/                    # Result / PageResult / BizException / MaskUtil
+    ├── module/user/               # 图形验证码 / 短信邮箱验证码 / 登录锁定
     └── module/evaluate/           # Dimension / EvaluationEngine
 ```
 
@@ -145,6 +176,8 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 | **数据字典**（枚举取值收口到 `sys_dict_item`） | ✅ 完成并已落库（`init.sql` + 规范 §12；原 `V2__data_dict.sql` 已合并至 `init.sql`；实库 110 列逐项比对一致） |
 | 业务模块骨架（12 个域） | ✅ 完成 |
 | **登录与 RBAC 权限**（`sys_role` / `sys_permission` / `sys_user_role` / `sys_role_permission`） | ✅ 完成（JWT 登录、权限码鉴权、角色授权接口；表数 12 → 16） |
+| **完整认证体系**（密码/短信/邮箱/统一认证、图形验证码、注册、找回密码） | ✅ 完成并已通过浏览器 E2E（2026-11-09）；`sys_user` 新增 `phone` / `email`（V4） |
+| **最小前端登录体系**（Vue 3） | ✅ 完成（登录/注册/找回密码/SSO 回调/工作台 + 路由守卫 + 401 跳转） |
 | **AI 评测引擎地基** | ✅ 完成（属迭代 2 内容，已提前落地） |
 | 课程管理 | ⏳ 迭代 1，`clazz` 模块仍为骨架 |
 
@@ -157,15 +190,20 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 >   请从 Git 历史取回该版本脚本执行一次。
 >   **RBAC 变更**（`sys_user.role` → `sys_user_role` 多对多）请对老库执行 **`docs/migration/V3__rbac.sql`**：
 >   它建 4 张权限表、按业务码迁移存量角色、再删除 `sys_user.role` 列与 `user_role` 字典。
+>   **认证字段变更**（手机号/邮箱）请再执行 **`docs/migration/V4__auth.sql`**：
+>   给 `sys_user` 增加 `phone` / `email` 及唯一索引，支持短信/邮箱验证码登录与找回密码。
 >   增量脚本一律不含 `DROP`、**可重复执行**，末尾带校验查询（**预期返回 0 行**；
 >   有输出说明库里存在字典外的旧取值，人工确认后补一条 `UPDATE` 再重跑）。
-> - **全新环境**：直接跑 `docs/init.sql`（已含 RBAC 四表与授权种子，**无需**再跑 V3）。
+> - **全新环境**：直接跑 `docs/init.sql`（已含 RBAC 四表、认证字段与授权种子，**无需**再跑 V3/V4）。
 >
 > 2026-09-22 的数据字典变更已按此流程落库：`ai_trial_platform` 由原 `V2__data_dict.sql`（现合并至 `init.sql`）收敛，
 > **12 张表 / 110 列的类型、可空、注释与全部索引均与 `init.sql` 逐项比对通过**，
 > 13 本字典 55 个取值、种子数据中文无乱码。
 > 2026-10-24 的 RBAC 改造后，`init.sql` 为 **16 张表**（系统类 7 + 业务类 9），
 > 权限点 19 个，角色授权数 `STUDENT` 7 / `TEACHER` 10 / `ADMIN` 19。
+> 2026-11-09 的认证增强通过 **`V4__auth.sql`** 给 `sys_user` 增加 `phone` / `email` 与唯一索引，
+> 已在实库执行并逐列比对；dev 环境由 `DataInitializer` 幂等创建 admin/teacher/student 三个演示账号。
+> 当日用临时库从 `init.sql` 全新建库后与实库做 `mysqldump --no-data` 结构比对:**16 张表 / 135 列无差异**。
 
 **评测引擎地基**是本工程目前完成度最高的部分，包含：
 
@@ -174,7 +212,7 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
   支持多个评测器共同贡献同一维度（如「教学表达」= 文本规则 60% + 普通话 ASR 40%）
 - `EvaluationEngine` 加权聚合——评测器缺失时**按剩余权重自动归一化**，
   这正是「百度 API 不可用时回退保底方案」的实现机制，引擎无需为此写特判
-- 28 项单元测试覆盖加权合并、权重归一化、契约校验、未评测判定
+- 19 项单元测试覆盖加权合并、权重归一化、契约校验、未评测判定（全项目当前 48 项测试）
 
 > `RuleEvaluator` / `AsrEvaluator` / `PostureEvaluator` / `LlmEvaluator` 四个实现仍是待填充的骨架，
 > 分别在迭代 2 / 5 / 5 / 4 落地。
@@ -206,8 +244,8 @@ mvn spotless:check      # 检查格式是否合规（CI 使用）
 | 迭代 | 内容 | 状态 |
 |---|---|---|
 | 迭代 0：脚手架 | 工程骨架、统一响应/异常/分页、数据库脚本、代码规范、Git 规范 | ✅ 已完成（tag `v0.1.0-iter0`） |
-| 迭代 1：身份与课程 | 登录注册（JWT）、班级/课程管理 | 进行中 |
-| 迭代 2：核心闭环 | **前端工程引入（Vue 3 + Vite）**、任务发布、试讲提交、RuleEvaluator、评测报告 + 雷达图 | 未开始 |
+| 迭代 1：身份与课程 | 登录注册（JWT）、班级/课程管理 | 🟡 认证与授权已完成（2026-11-09），班级/课程待做 |
+| 迭代 2：核心闭环 | 任务发布、试讲提交、RuleEvaluator、评测报告 + 雷达图（前端工程已在迭代 1 提前引入） | 未开始 |
 | 迭代 3：支撑功能 | 题库资源、教师批阅、班级看板、Excel 导出、排行榜、进步曲线 | 未开始 |
 | 迭代 4：增强（可选） | 虚拟课堂简版（WebSocket 事件流）、音视频上传、达标证书、LlmEvaluator 接入 | 未开始 |
 | 迭代 5：AI 音视频评测与延后项（尽力） | 普通话 ASR 评测、姿态分析、直播（SRS/HLS）、微服务最小拆分 | 未开始 |

@@ -23,6 +23,8 @@
 --   4. V3（RBAC 权限模型）：新增 sys_role / sys_permission / sys_user_role /
 --      sys_role_permission 四表，角色改为「用户 N—N 角色」多对多；原
 --      sys_user.role 单列与字典 user_role 一并移除，角色取值权威源改为 sys_role。
+--   5. V4（认证增强，2026-11-09）：sys_user 新增 phone / email 两列及唯一索引，
+--      用于短信/邮箱验证码登录与找回密码；存量环境执行 docs/migration/V4__auth.sql。
 --
 -- ⚠️ 本脚本含 DROP DATABASE，会清空同名库的全部数据！
 --    仅用于全新环境初始化；已有数据的环境请勿执行，改用 docs/migration/ 的增量脚本。
@@ -291,12 +293,16 @@ CREATE TABLE sys_user (
     real_name  VARCHAR(50)  NOT NULL COMMENT '真实姓名',
     major      VARCHAR(20)  DEFAULT NULL COMMENT '专业（字典 major，值为字典码；NULL 表示师范生尚未绑定，见 UC-S01）',
     grade      VARCHAR(20)  DEFAULT NULL COMMENT '年级（字典 grade，值为字典码，取值口径为入学年份；NULL 表示尚未绑定）',
+    phone      VARCHAR(20)  DEFAULT NULL COMMENT '手机号（用于短信验证码登录/找回密码；接口与日志输出必须脱敏）',
+    email      VARCHAR(100) DEFAULT NULL COMMENT '邮箱（用于邮箱验证码登录/找回密码；接口与日志输出必须脱敏）',
     created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
     PRIMARY KEY (id),
-    -- 服务查询：登录时按登录名查用户
-    UNIQUE KEY uk_username (username)
+    -- 服务查询：登录时按登录名/手机号/邮箱查用户
+    UNIQUE KEY uk_username (username),
+    UNIQUE KEY uk_phone (phone),
+    UNIQUE KEY uk_email (email)
 ) ENGINE = InnoDB COMMENT ='用户表';
 
 -- 4. 班级表：教师建班、关联课程
@@ -800,12 +806,17 @@ SELECT 'evaluation_report.evaluator_type 存在字典外取值', id, evaluator_t
 --
 -- 7.2 认证与口令
 --   sys_user.password 只存 BCrypt 哈希（定长 60 字符），禁止明文或可逆加密；
---   登录失败计数与锁定由应用层实现；本脚本不预置默认管理员账号
---   （BCrypt 无法在 SQL 中静态生成；由应用首次启动的 DataInitializer 创建 admin/admin123）。
+--   BCrypt 盐值内嵌在哈希串中，校验时由 PasswordEncoder 取盐后慢哈希重算比对。
+--   登录失败计数与锁定由应用层实现（内存计数器，阈值见 auth.login.max-failures）；
+--   本脚本不预置默认账号（BCrypt 无法在 SQL 中静态生成；由应用首次启动的
+--   DataInitializer 在 dev 环境创建演示账号，清单见 README「演示账号」）。
+--   验证码/短信/邮件通道默认走模拟实现（验证码打印到后端日志），
+--   生产环境必须配置真实通道并关闭 auth.code.expose-in-response。
 --
 -- 7.3 敏感数据
---   当前未存手机号/身份证号；如后续新增，必须加密存储、单独授权，
---   且不得以明文进入日志与报表。
+--   sys_user.phone / email 用于验证码登录与找回密码，属个人敏感信息：
+--   接口响应与日志必须脱敏（如 138****0000、a***@example.com），
+--   仅认证与用户管理接口按最小必要读取；生产环境建议对两列做加密存储。
 --   成绩、评语、证书文件路径属业务敏感数据：接口按角色最小可见，
 --   文件路径不直接暴露公网，下载走鉴权后的应用接口。
 --
